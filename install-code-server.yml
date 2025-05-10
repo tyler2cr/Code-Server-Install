@@ -1,6 +1,7 @@
 ---
 - name: Install and configure code-server
   hosts: localhost
+  connection: local
   become: true
   vars:
     code_server_version: "4.22.1"
