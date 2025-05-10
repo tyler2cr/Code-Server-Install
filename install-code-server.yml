@@ -1,0 +1,73 @@
+---
+- name: Install and configure code-server
+  hosts: localhost
+  become: true
+  vars:
+    code_server_version: "4.22.1"
+    code_server_config_dir: "/home/{{ ansible_user }}/.config/code-server"
+    code_server_config_file: "{{ code_server_config_dir }}/config.yaml"
+    code_server_password: "changeme"  # You should change this!
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - curl
+          - wget
+          - gnupg
+          - software-properties-common
+        state: present
+        update_cache: yes
+
+    - name: Download code-server installation script
+      get_url:
+        url: https://code-server.dev/install.sh
+        dest: /tmp/install.sh
+        mode: '0755'
+
+    - name: Install code-server
+      shell: /tmp/install.sh
+      args:
+        creates: /usr/bin/code-server
+
+    - name: Create code-server config directory
+      file:
+        path: "{{ code_server_config_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Configure code-server
+      copy:
+        dest: "{{ code_server_config_file }}"
+        content: |
+          bind-addr: 0.0.0.0:8080
+          auth: password
+          password: {{ code_server_password }}
+          cert: false
+        mode: '0644'
+
+    - name: Create systemd service file
+      copy:
+        dest: /etc/systemd/system/code-server.service
+        content: |
+          [Unit]
+          Description=code-server
+          After=network.target
+
+          [Service]
+          Type=simple
+          User={{ ansible_user }}
+          WorkingDirectory=/home/{{ ansible_user }}
+          ExecStart=/usr/bin/code-server
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+
+    - name: Enable and start code-server service
+      systemd:
+        name: code-server
+        state: started
+        enabled: yes
+        daemon_reload: yes 
