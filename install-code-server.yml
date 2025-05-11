@@ -10,6 +10,11 @@
     code_server_password: "changeme"  # You should change this!
 
   tasks:
+    - name: Check if code-server is already installed
+      stat:
+        path: /usr/bin/code-server
+      register: code_server_binary
+
     - name: Install required packages
       apt:
         name:
@@ -19,23 +24,31 @@
           - software-properties-common
         state: present
         update_cache: yes
+      when: not code_server_binary.stat.exists
 
     - name: Download code-server installation script
       get_url:
         url: https://code-server.dev/install.sh
         dest: /tmp/install.sh
         mode: '0755'
+      when: not code_server_binary.stat.exists
 
     - name: Install code-server
       shell: /tmp/install.sh
       args:
         creates: /usr/bin/code-server
+      when: not code_server_binary.stat.exists
 
     - name: Create code-server config directory
       file:
         path: "{{ code_server_config_dir }}"
         state: directory
         mode: '0755'
+
+    - name: Check if config file exists
+      stat:
+        path: "{{ code_server_config_file }}"
+      register: config_file
 
     - name: Configure code-server
       copy:
@@ -46,6 +59,12 @@
           password: {{ code_server_password }}
           cert: false
         mode: '0644'
+      when: not config_file.stat.exists
+
+    - name: Check if service file exists
+      stat:
+        path: /etc/systemd/system/code-server.service
+      register: service_file
 
     - name: Create systemd service file
       copy:
@@ -65,10 +84,31 @@
           [Install]
           WantedBy=multi-user.target
         mode: '0644'
+      when: not service_file.stat.exists
+      notify: reload systemd
 
     - name: Enable and start code-server service
       systemd:
         name: code-server
         state: started
         enabled: yes
+        daemon_reload: "{{ service_file.changed }}"
+
+    - name: Verify code-server service is running
+      systemd:
+        name: code-server
+        state: started
+      register: service_status
+      failed_when: not service_status.status.ActiveState == "active"
+
+    - name: Display access information
+      debug:
+        msg: |
+          ✅ code-server has been successfully installed and is running
+          You can access it at: http://{{ ansible_hostname }}:8080
+          Default password is set in the playbook (you should change it)
+
+  handlers:
+    - name: reload systemd
+      systemd:
         daemon_reload: yes 
