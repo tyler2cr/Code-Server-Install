@@ -1,0 +1,15 @@
+[Unit]
+Description=Code Server
+After=network.target
+
+[Service]
+Type=simple
+User={{ target_user }}
+Environment=PATH=/home/{{ target_user }}/.local/bin:{{ ansible_env.PATH }}
+WorkingDirectory=/home/{{ target_user }}
+ExecStart=/home/{{ target_user }}/.local/bin/code-server --bind-addr 0.0.0.0:{{ code_server_port }}
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target 

@@ -1,0 +1,80 @@
+---
+- name: Install code-server on Ubuntu
+  hosts: localhost
+  connection: local
+  become: true
+  vars:
+    code_server_version: "4.100.0"
+    code_server_port: 8080
+    target_user: "{{ lookup('env', 'USER') }}"
+    local_bin: "/home/{{ target_user }}/.local/bin"
+    local_lib: "/home/{{ target_user }}/.local/lib"
+    code_server_path: "{{ local_lib }}/code-server-{{ code_server_version }}"
+    code_server_service_name: "code-server"
+    code_server_config_dir: "/home/{{ target_user }}/.config/code-server"
+
+  tasks:
+    - name: Create required directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+      with_items:
+        - "{{ local_bin }}"
+        - "{{ local_lib }}"
+        - "{{ code_server_config_dir }}"
+
+    - name: Check if code-server is already installed
+      stat:
+        path: "{{ code_server_path }}/bin/code-server"
+      register: code_server_binary
+
+    - name: Download and extract code-server
+      unarchive:
+        src: "https://github.com/coder/code-server/releases/download/v{{ code_server_version }}/code-server-{{ code_server_version }}-linux-amd64.tar.gz"
+        dest: "{{ local_lib }}"
+        remote_src: yes
+        creates: "{{ code_server_path }}"
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+      when: not code_server_binary.stat.exists
+
+    - name: Create symlink for code-server binary
+      file:
+        src: "{{ code_server_path }}/bin/code-server"
+        dest: "{{ local_bin }}/code-server"
+        state: link
+        force: yes
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+
+    - name: Add local bin to PATH
+      lineinfile:
+        path: "/home/{{ target_user }}/.bashrc"
+        line: 'export PATH="$HOME/.local/bin:$PATH"'
+        state: present
+        create: yes
+        regexp: '^export PATH="\$HOME/\.local/bin:\$PATH"'
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+
+    - name: Create systemd service file
+      template:
+        src: code-server.service.j2
+        dest: /etc/systemd/system/{{ code_server_service_name }}.service
+        mode: '0644'
+      notify: reload systemd
+
+    - name: Ensure code-server service is enabled and started
+      systemd:
+        name: "{{ code_server_service_name }}"
+        state: started
+        enabled: yes
+        daemon_reload: yes
+
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes 
