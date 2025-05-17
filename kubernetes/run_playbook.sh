@@ -47,7 +47,7 @@ ansible-galaxy collection install -r requirements.yml
 print_message "$YELLOW" "Running Ansible playbook..."
 if ansible-playbook -i inventory.ini playbook.yml; then
     print_message "$GREEN" "Playbook completed successfully!"
-    print_message "$GREEN" "You can access code-server at: https://localhost:8443"
+    # print_message "$GREEN" "You can access code-server at: https://localhost:8443"
 else
     print_message "$RED" "Playbook failed!"
     exit 1
