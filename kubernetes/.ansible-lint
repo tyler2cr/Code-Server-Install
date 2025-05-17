@@ -1,0 +1,9 @@
+---
+# Enable offline mode
+offline: true
+
+# Exclude some rules that might cause issues
+skip_list:
+  - 'schema'
+  - 'no-changed-when'
+  - 'fqcn-builtins' 

@@ -1,0 +1,3 @@
+---
+# Default path for local cluster kubeconfig
+local_kubeconfig: /etc/kubernetes/admin.conf 

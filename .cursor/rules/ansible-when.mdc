@@ -3,4 +3,4 @@ description:
 globs: 
 alwaysApply: false
 ---
-for ansible tasks, always put the "when" attribute at the top of the task, not the bottom
+for ansible tasks, always put the "when" attribute at the top of the task, not the bottom. if its a task block, also put the when before the tasks in the block

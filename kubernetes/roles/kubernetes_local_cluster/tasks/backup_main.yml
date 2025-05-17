@@ -1,0 +1,197 @@
+# ---
+# # Check if local cluster config exists
+# - name: Check if local cluster config exists
+#   stat:
+#     path: "{{ local_kubeconfig }}"
+#   register: local_config
+#   changed_when: false
+
+# # Check current context and switch if needed
+# - name: Get current context
+#   command: kubectl config current-context
+#   register: current_context
+#   changed_when: false
+#   ignore_errors: true
+
+# - name: Set local cluster flag
+#   set_fact:
+#     is_local_cluster: "{{ current_context.stdout is defined and current_context.stdout == 'kubernetes-admin@kubernetes' }}"
+
+# # Backup existing kubeconfig if it exists
+# - name: Ensure .kube directory exists
+#   file:
+#     path: "{{ ansible_env.HOME }}/.kube"
+#     state: directory
+#     mode: '0755'
+
+# - name: Backup existing kubeconfig
+#   copy:
+#     src: "{{ ansible_env.HOME }}/.kube/config"
+#     dest: "{{ ansible_env.HOME }}/.kube/config.backup"
+#     remote_src: true
+#   when: local_config.stat.exists
+#   register: backup_result
+
+# # Reset existing cluster if needed
+# - name: Check if cluster is already initialized
+#   command: kubectl cluster-info
+#   register: cluster_info
+#   changed_when: false
+#   ignore_errors: true
+
+# - name: Stop kubelet service
+#   service:
+#     name: kubelet
+#     state: stopped
+#   when: cluster_info.rc == 0
+
+# - name: Reset existing cluster
+#   command: kubeadm reset --force
+#   when: cluster_info.rc == 0
+#   register: reset_result
+
+# - name: Clean up etcd data
+#   file:
+#     path: /var/lib/etcd
+#     state: absent
+#   when: cluster_info.rc == 0
+
+# - name: Clean up Kubernetes config
+#   file:
+#     path: /etc/kubernetes
+#     state: absent
+#   when: cluster_info.rc == 0
+
+# - name: Clean up Kubernetes manifests
+#   file:
+#     path: /etc/kubernetes/manifests
+#     state: absent
+#   when: cluster_info.rc == 0
+
+# - name: Clean up Kubernetes pki
+#   file:
+#     path: /etc/kubernetes/pki
+#     state: absent
+#   when: cluster_info.rc == 0
+
+# - name: Clean up Kubernetes logs
+#   file:
+#     path: /var/log/kubernetes
+#     state: absent
+#   when: cluster_info.rc == 0
+
+# - name: Clean up Kubernetes cni
+#   file:
+#     path: /etc/cni/net.d
+#     state: absent
+#   when: cluster_info.rc == 0
+
+# - name: Clean up Kubernetes cgroup
+#   file:
+#     path: /sys/fs/cgroup/kubernetes
+#     state: absent
+#   when: cluster_info.rc == 0
+
+# - name: Start kubelet service
+#   service:
+#     name: kubelet
+#     state: started
+
+# # Install kubeadm if not already installed
+# - name: Check if kubeadm is installed
+#   command: which kubeadm
+#   register: kubeadm_check
+#   changed_when: false
+#   ignore_errors: true
+
+# - name: Add Kubernetes apt repository
+#   apt_repository:
+#     repo: deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core/stable/ubuntu/ {{ ansible_distribution_release }} main
+#     state: present
+#     filename: kubernetes
+#   when: kubeadm_check.rc != 0
+
+# - name: Create directory for apt keyring
+#   file:
+#     path: /etc/apt/keyrings
+#     state: directory
+#     mode: '0755'
+#   when: kubeadm_check.rc != 0
+
+# - name: Download Kubernetes apt key
+#   get_url:
+#     url: https://pkgs.k8s.io/core/stable/ubuntu/apt-key.gpg
+#     dest: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+#     mode: '0644'
+#   when: kubeadm_check.rc != 0
+
+# - name: Update apt cache
+#   apt:
+#     update_cache: yes
+#   when: kubeadm_check.rc != 0
+
+# - name: Install kubeadm, kubectl, and kubelet
+#   apt:
+#     name:
+#       - kubeadm
+#       - kubectl
+#       - kubelet
+#     state: present
+#   when: kubeadm_check.rc != 0
+
+# # Initialize cluster
+# - name: Initialize Kubernetes cluster
+#   command: kubeadm init --pod-network-cidr=192.168.0.0/16
+#   register: init_result
+
+# - name: Copy kube config
+#   copy:
+#     src: /etc/kubernetes/admin.conf
+#     dest: "{{ local_kubeconfig }}"
+#     remote_src: true
+#     mode: '0644'
+
+# # Install Calico network plugin
+# - name: Check if Calico is installed
+#   command: kubectl get pods -n kube-system -l k8s-app=calico-node
+#   register: calico_check
+#   changed_when: false
+#   ignore_errors: true
+
+# - name: Install Calico network plugin
+#   command: kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/calico.yaml
+#   when: calico_check.rc != 0
+
+# # Wait for cluster to be ready
+# - name: Wait for Kubernetes to be ready
+#   command: kubectl get nodes
+#   register: nodes
+#   until: nodes.stdout is defined and 'Ready' in nodes.stdout
+#   retries: 30
+#   delay: 10
+#   changed_when: false
+
+# # Ensure we're using the local cluster context
+# - name: Copy local kubeconfig
+#   copy:
+#     src: "{{ local_kubeconfig }}"
+#     dest: "{{ ansible_env.HOME }}/.kube/config"
+#     remote_src: true
+#     mode: '0644'
+#   when: not is_local_cluster and local_config.stat.exists
+
+# - name: Set local context
+#   command: kubectl config use-context kubernetes-admin@kubernetes
+#   when: not is_local_cluster and local_config.stat.exists
+
+# # Verify cluster is accessible
+# - name: Wait for cluster to be accessible
+#   command: kubectl get nodes
+#   register: cluster_check
+#   until: cluster_check.rc == 0
+#   retries: 30
+#   delay: 10
+#   changed_when: false
+
+  
+

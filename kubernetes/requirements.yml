@@ -3,4 +3,8 @@ collections:
   - name: kubernetes.core
     version: ">=2.3.0"
   - name: community.kubernetes
-    version: ">=2.0.0" 
+    version: ">=2.0.0"
+  - name: ansible.posix
+    version: ">=1.4.0"
+  - name: community.general
+    version: ">=6.0.0" 
