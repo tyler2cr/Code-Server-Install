@@ -1,0 +1,14 @@
+---
+- name: Setup Kubernetes and deploy code-server
+  hosts: localhost
+  become: true
+
+  pre_tasks:
+    - name: Install kubernetes.core collection
+      ansible.builtin.command:
+        cmd: ansible-galaxy collection install kubernetes.core
+        creates: "{{ ansible_collections_path }}/kubernetes/core"
+
+  roles:
+    - kubernetes_cluster
+    - code_server 

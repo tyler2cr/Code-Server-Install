@@ -1,0 +1,27 @@
+---
+- name: Create code-server namespace
+  kubernetes.core.k8s:
+    name: code-server
+    api_version: v1
+    kind: Namespace
+    state: present
+
+- name: Add code-server Helm repository
+  kubernetes.core.helm_repository:
+    name: code-server
+    repo_url: https://coder.com/docs/code-server/helm
+
+- name: Install code-server using Helm
+  kubernetes.core.helm:
+    name: code-server
+    chart_ref: code-server/code-server
+    namespace: code-server
+    release_namespace: code-server
+    state: present
+    values:
+      service:
+        type: NodePort
+        port: 8443
+      persistence:
+        enabled: true
+        size: 10Gi 
