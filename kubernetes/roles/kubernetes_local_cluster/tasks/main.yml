@@ -59,4 +59,78 @@
             update_cache: true
           when: kubelet_check.rc != 0
 
+# Initialize Kubernetes cluster
+- name: Setup Kubernetes cluster
+  block:
+    - name: Check if cluster is already initialized
+      block:
+        - name: Check if cluster is already initialized
+          ansible.builtin.command: kubectl cluster-info
+          register: cluster_already_exists
+          changed_when: false
+          ignore_errors: true
 
+        - name: Set cluster initialization status
+          ansible.builtin.set_fact:
+            cluster_initialized: "{{ cluster_already_exists.rc == 0 | bool }}"
+
+    - name: Setup kubeconfig file
+      when: not cluster_initialized
+      block:
+        - name: Initialize cluster with kubeadm
+          ansible.builtin.command: >
+            kubeadm init
+            --apiserver-advertise-address=127.0.0.1
+            --apiserver-cert-extra-sans=localhost
+            --pod-network-cidr=10.244.0.0/16
+            --ignore-preflight-errors=all
+          changed_when: not cluster_initialized
+
+        - name: Create .kube directory
+          ansible.builtin.file:
+            path: "{{ ansible_env.HOME }}/.kube"
+            state: directory
+            mode: '0755'
+
+        - name: Copy kubeconfig to user directory
+          ansible.builtin.copy:
+            src: /etc/kubernetes/admin.conf
+            dest: "{{ ansible_env.HOME }}/.kube/config"
+            remote_src: true
+            mode: '0644'
+          changed_when: not cluster_initialized
+
+    - name: Install and configure Cilium
+      when: not cluster_initialized
+      block:
+        - name: Download Cilium CLI
+          ansible.builtin.get_url:
+            url: https://github.com/cilium/cilium-cli/releases/latest/download/cilium-linux-amd64.tar.gz
+            dest: /tmp/cilium-linux-amd64.tar.gz
+            mode: '0644'
+          changed_when: not cluster_initialized
+
+        - name: Install Cilium CLI
+          ansible.builtin.unarchive:
+            src: /tmp/cilium-linux-amd64.tar.gz
+            dest: /usr/local/bin
+            remote_src: true
+            extra_opts: [--strip-components=1]
+          become: true
+          changed_when: not cluster_initialized
+
+        - name: Clean up Cilium CLI download
+          ansible.builtin.file:
+            path: /tmp/cilium-linux-amd64.tar.gz
+            state: absent
+          changed_when: not cluster_initialized
+
+        - name: Install Cilium
+          ansible.builtin.command: cilium install
+          changed_when: not cluster_initialized
+
+        - name: Verify Cilium status
+          ansible.builtin.command: cilium status
+          register: cilium_status
+          changed_when: false
+          failed_when: cilium_status.rc != 0
