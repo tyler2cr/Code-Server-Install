@@ -1,20 +1,22 @@
 ---
 - name: Setup Kubernetes and deploy code-server
   hosts: localhost
+  connection: local
   become: true
-  become_method: sudo
+  become_method: ansible.builtin.sudo
 
   pre_tasks:
     - name: Check if kubernetes.core collection is installed
-      command: ansible-galaxy collection list kubernetes.core
+      ansible.builtin.command: ansible-galaxy collection list kubernetes.core
       register: collection_check
       ignore_errors: true
       changed_when: false
 
     - name: Install kubernetes.core collection
-      command: ansible-galaxy collection install kubernetes.core
+      ansible.builtin.command: ansible-galaxy collection install kubernetes.core
       when: collection_check.rc != 0
+      changed_when: collection_check.rc != 0
 
   roles:
     - kubernetes_local_cluster
-    # - code_server 
+    # - code_server

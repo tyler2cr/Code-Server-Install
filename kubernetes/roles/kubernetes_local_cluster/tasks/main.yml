@@ -5,35 +5,35 @@
     - name: Check kubectl installation status
       block:
         - name: Check if kubectl is installed
-          command: which kubectl
+          ansible.builtin.command: which kubectl
           register: kubectl_check
           changed_when: false
           ignore_errors: true
 
         - name: Debug kubectl status
-          debug:
+          ansible.builtin.debug:
             msg: "kubectl is {{ 'installed' if kubectl_check.rc == 0 else 'not installed' }}"
 
     - name: Check kubeadm installation status
       block:
         - name: Check if kubeadm is installed
-          command: which kubeadm
+          ansible.builtin.command: which kubeadm
           register: kubeadm_check
           changed_when: false
           ignore_errors: true
 
         - name: Debug kubeadm status
-          debug:
+          ansible.builtin.debug:
             msg: "kubeadm is {{ 'installed' if kubeadm_check.rc == 0 else 'not installed' }}"
 
     - name: Check kubelet installation status
       block:
         - name: Check if kubelet is installed
-          command: which kubelet
+          ansible.builtin.command: which kubelet
           register: kubelet_check
           changed_when: false
           ignore_errors: true
 
         - name: Debug kubelet status
-          debug:
+          ansible.builtin.debug:
             msg: "kubelet is {{ 'installed' if kubelet_check.rc == 0 else 'not installed' }}"
