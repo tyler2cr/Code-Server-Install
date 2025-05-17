@@ -2,35 +2,38 @@
 # Check if required tools are installed
 - name: Check if required tools are installed
   block:
-    # Check if kubectl is installed
-    - name: Check if kubectl is installed
-      command: which kubectl
-      register: kubectl_check
-      changed_when: false
-      ignore_errors: true
+    - name: Check kubectl installation status
+      block:
+        - name: Check if kubectl is installed
+          command: which kubectl
+          register: kubectl_check
+          changed_when: false
+          ignore_errors: true
 
-    - name: Debug kubectl status
-      debug:
-        msg: "kubectl is {{ 'installed' if kubectl_check.rc == 0 else 'not installed' }}"
+        - name: Debug kubectl status
+          debug:
+            msg: "kubectl is {{ 'installed' if kubectl_check.rc == 0 else 'not installed' }}"
 
-    # Check if kubeadm is installed
-    - name: Check if kubeadm is installed
-      command: which kubeadm
-      register: kubeadm_check
-      changed_when: false
-      ignore_errors: true
+    - name: Check kubeadm installation status
+      block:
+        - name: Check if kubeadm is installed
+          command: which kubeadm
+          register: kubeadm_check
+          changed_when: false
+          ignore_errors: true
 
-    - name: Debug kubeadm status
-      debug:
-        msg: "kubeadm is {{ 'installed' if kubeadm_check.rc == 0 else 'not installed' }}"
+        - name: Debug kubeadm status
+          debug:
+            msg: "kubeadm is {{ 'installed' if kubeadm_check.rc == 0 else 'not installed' }}"
 
-    # Check if kubelet is installed
-    - name: Check if kubelet is installed
-      command: which kubelet
-      register: kubelet_check
-      changed_when: false
-      ignore_errors: true
+    - name: Check kubelet installation status
+      block:
+        - name: Check if kubelet is installed
+          command: which kubelet
+          register: kubelet_check
+          changed_when: false
+          ignore_errors: true
 
-    - name: Debug kubelet status
-      debug:
-        msg: "kubelet is {{ 'installed' if kubelet_check.rc == 0 else 'not installed' }}" 
+        - name: Debug kubelet status
+          debug:
+            msg: "kubelet is {{ 'installed' if kubelet_check.rc == 0 else 'not installed' }}"
