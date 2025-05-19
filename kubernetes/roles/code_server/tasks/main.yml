@@ -43,10 +43,9 @@
     values:
       service:
         type: NodePort
-        port: 8443
+        port: 8080
       extraArgs:
-        - --cert=false
-        - --bind-addr=0.0.0.0:8443
+        - --bind-addr=0.0.0.0:8080
       persistence:
         enabled: true
         storageClass: openebs-hostpath
@@ -68,3 +67,4 @@
         limits:
           memory: "1Gi"
           cpu: "500m"
+
