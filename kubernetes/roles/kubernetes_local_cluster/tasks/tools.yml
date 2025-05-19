@@ -64,3 +64,44 @@
     name: kubernetes
     state: present
   become: true
+
+- name: Setup Helm and plugins
+  block:
+    - name: Check if Helm is installed
+      ansible.builtin.command: which helm
+      register: helm_check
+      changed_when: false
+      ignore_errors: true
+
+    - name: Download and extract Helm
+      when: helm_check.rc != 0
+      block:
+        - name: Install Helm if not present
+          ansible.builtin.get_url:
+            url: https://get.helm.sh/helm-v3.14.3-linux-amd64.tar.gz
+            dest: /tmp/helm.tar.gz
+            mode: '0644'
+          become: true
+
+        - name: Extract Helm binary
+          ansible.builtin.unarchive:
+            src: /tmp/helm.tar.gz
+            dest: /usr/local/bin
+            remote_src: true
+            extra_opts: [--strip-components=1]
+          become: true
+
+    - name: Check if helm-diff plugin is installed
+      ansible.builtin.command: helm plugin list | grep diff
+      register: helm_diff_check
+      changed_when: false
+      ignore_errors: true
+
+    - name: Install helm-diff plugin
+      kubernetes.core.helm_plugin:
+        plugin_name: diff
+        plugin_url: https://github.com/databus23/helm-diff
+        plugin_version: v3.8.1
+        state: present
+      when: helm_diff_check.rc != 0
+      become: true
