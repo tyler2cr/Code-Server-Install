@@ -1,0 +1,11 @@
+---
+- name: Check if kubernetes.core collection is installed
+  ansible.builtin.command: ansible-galaxy collection list kubernetes.core
+  register: collection_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Install kubernetes.core collection
+  ansible.builtin.command: ansible-galaxy collection install kubernetes.core
+  when: collection_check.rc != 0
+  changed_when: collection_check.rc != 0
