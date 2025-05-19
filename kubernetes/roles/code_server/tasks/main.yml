@@ -1,28 +1,52 @@
 ---
 - name: Create code-server namespace
-  kubernetes.core.k8s:
-    name: code-server
-    api_version: v1
-    kind: Namespace
-    state: present
+  block:
+    - name: Check if code-server namespace exists
+      kubernetes.core.k8s_info:
+        kind: Namespace
+        name: code-server
+      register: namespace_check
+      changed_when: false
+      ignore_errors: true
+
+    - name: Create code-server namespace
+      kubernetes.core.k8s:
+        name: code-server
+        api_version: v1
+        kind: Namespace
+        state: present
+      when: namespace_check.resources | length == 0
 
 - name: Clone code-server repository
-  ansible.builtin.git:
-    repo: https://github.com/coder/code-server
-    dest: /tmp/code-server
-    version: main
-    force: true
+  block:
+    - name: Check if code-server repository exists
+      ansible.builtin.stat:
+        path: /tmp/code-server/ci/helm-chart
+      register: repo_check
+      changed_when: false
 
-- name: Install code-server using Helm
+    - name: Clone code-server repository
+      ansible.builtin.git:
+        repo: https://github.com/coder/code-server
+        dest: /tmp/code-server
+        version: main
+        force: true
+      when: not repo_check.stat.exists
+
+- name: Install or upgrade code-server using Helm
   kubernetes.core.helm:
     name: code-server
     chart_ref: /tmp/code-server/ci/helm-chart
     namespace: code-server
     state: present
+    update_repo_cache: true
     values:
       service:
         type: NodePort
         port: 8443
+      extraArgs:
+        - --cert=false
+        - --bind-addr=0.0.0.0:8443
       persistence:
         enabled: true
         storageClass: openebs-hostpath
@@ -35,6 +59,12 @@
         enabled: true
         securityContext:
           runAsUser: 0
-      extraArgs:
-        - --cert=false
-        - --bind-addr=0.0.0.0:8443
+      podAnnotations:
+        checksum/config: "{{ lookup('pipe', 'date +%s') }}"
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "100m"
+        limits:
+          memory: "1Gi"
+          cpu: "500m"
