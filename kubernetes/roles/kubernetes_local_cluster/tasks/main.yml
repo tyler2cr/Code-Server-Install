@@ -1,5 +1,5 @@
 ---
-- name: Collection installation tasks
+- name: Ansible kubernetescollection installation tasks
   ansible.builtin.import_tasks: collections.yml
 
 - name: Tools installation tasks
