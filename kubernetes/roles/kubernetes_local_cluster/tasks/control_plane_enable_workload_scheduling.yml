@@ -1,0 +1,17 @@
+---
+- name: Check if control-plane taint exists
+  ansible.builtin.command: >
+    kubectl --kubeconfig /etc/kubernetes/admin.conf get nodes {{ ansible_hostname }}
+    -o jsonpath='{.spec.taints[?(@.key=="node-role.kubernetes.io/control-plane")]}'
+  register: taint_check
+  changed_when: false
+  ignore_errors: true
+  become: true
+
+- name: Remove control-plane taint
+  ansible.builtin.command: >
+    kubectl --kubeconfig /etc/kubernetes/admin.conf taint nodes {{ ansible_hostname }}
+    node-role.kubernetes.io/control-plane-
+  become: true
+  changed_when: true
+  when: taint_check.stdout != ""
