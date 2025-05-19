@@ -158,54 +158,54 @@
     #   when: false
     #   # when: true
 
-    # - name: Setup kubeconfig file
-    #   when: not cluster_initialized
-    #   block:
-    #     - name: Reset any existing cluster
-    #       ansible.builtin.command: kubeadm reset -f
-    #       become: true
-    #       changed_when: true
+    - name: Initialize cluster
+      when: not cluster_initialized
+      block:
+        - name: Reset any existing cluster
+          ansible.builtin.command: kubeadm reset -f
+          become: true
+          changed_when: true
 
-    #     - name: Initialize cluster with kubeadm
-    #       ansible.builtin.command: >
-    #         kubeadm init
-    #         --apiserver-advertise-address={{ ansible_default_ipv4.address }}
-    #         --apiserver-cert-extra-sans=localhost
-    #         --pod-network-cidr=10.244.0.0/16
-    #         --ignore-preflight-errors=all
-    #         --node-name={{ ansible_hostname }}
-    #       become: true
-    #       changed_when: not cluster_initialized
+        - name: Initialize cluster with kubeadm
+          ansible.builtin.command: >
+            kubeadm init
+            --apiserver-advertise-address={{ ansible_default_ipv4.address }}
+            --apiserver-cert-extra-sans=localhost
+            --pod-network-cidr=10.244.0.0/16
+            --ignore-preflight-errors=all
+            --node-name={{ ansible_hostname }}
+          become: true
+          changed_when: not cluster_initialized
 
-    #     - name: Create .kube directory
-    #       ansible.builtin.file:
-    #         path: "{{ ansible_env.HOME }}/.kube"
-    #         state: directory
-    #         mode: '0755'
+        - name: Create .kube directory
+          ansible.builtin.file:
+            path: "{{ ansible_env.HOME }}/.kube"
+            state: directory
+            mode: '0755'
 
-    #     - name: Copy kubeconfig to user directory
-    #       ansible.builtin.copy:
-    #         src: /etc/kubernetes/admin.conf
-    #         dest: "{{ ansible_env.HOME }}/.kube/config"
-    #         remote_src: true
-    #         mode: '0644'
-    #       become: true
-    #       changed_when: not cluster_initialized
+        - name: Copy kubeconfig to user directory
+          ansible.builtin.copy:
+            src: /etc/kubernetes/admin.conf
+            dest: "{{ ansible_env.HOME }}/.kube/config"
+            remote_src: true
+            mode: '0644'
+          become: true
+          changed_when: not cluster_initialized
 
-    #     - name: Wait for node to be ready
-    #       kubernetes.core.k8s_info:
-    #         name: "{{ ansible_hostname }}"
-    #         kind: Node
-    #         wait: true
-    #         wait_condition:
-    #           type: Ready
-    #           status: "True"
-    #         wait_timeout: 300
-    #       register: node_wait
-    #       retries: 3
-    #       delay: 10
-    #       until: node_wait is success
-    #       changed_when: false
+        - name: Wait for node to be ready
+          kubernetes.core.k8s_info:
+            name: "{{ ansible_hostname }}"
+            kind: Node
+            wait: true
+            wait_condition:
+              type: Ready
+              status: "True"
+            wait_timeout: 300
+          register: node_wait
+          retries: 3
+          delay: 10
+          until: node_wait is success
+          changed_when: false
 
     # - name: Install and configure Cilium
     #   when: not cluster_initialized
