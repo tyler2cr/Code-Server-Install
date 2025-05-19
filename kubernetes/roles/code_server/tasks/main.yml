@@ -68,3 +68,43 @@
           memory: "1Gi"
           cpu: "500m"
 
+- name: Display code-server access URL
+  block:
+    - name: Get Node IP for code-server URL
+      ansible.builtin.command:
+        cmd: kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}'
+      register: node_ip_result
+      changed_when: false
+      check_mode: false # Always run this to get info
+
+    - name: Get NodePort for code-server URL
+      ansible.builtin.command:
+        cmd: kubectl get svc -n code-server code-server -o jsonpath='{.spec.ports[0].nodePort}'
+      register: node_port_result
+      changed_when: false
+      check_mode: false # Always run this to get info
+
+    - name: Display code-server access URL
+      ansible.builtin.debug:
+        msg: "You can access code-server at: http://{{ node_ip_result.stdout }}:{{ node_port_result.stdout }}"
+      when: node_ip_result.stdout and node_port_result.stdout
+
+- name: Display code-server password
+  block:
+    - name: Get code-server secret
+      kubernetes.core.k8s_info:
+        kind: Secret
+        namespace: code-server
+        name: code-server # Assuming secret name matches Helm release name
+      register: codeserver_secret_result
+      changed_when: false
+      check_mode: false # Always run this to get info
+
+    - name: Decode and display code-server password
+      ansible.builtin.debug:
+        msg: "The code-server password is: {{ codeserver_secret_result.resources[0].data.password | b64decode }}"
+      when:
+        - codeserver_secret_result.resources is defined
+        - codeserver_secret_result.resources | length > 0
+        - codeserver_secret_result.resources[0].data.password is defined
+      # no_log: true # Prevent password from being logged in Ansible output if verbose
