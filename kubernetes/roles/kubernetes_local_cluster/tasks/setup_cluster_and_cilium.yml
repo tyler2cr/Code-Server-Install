@@ -1,0 +1,190 @@
+# Initialize Kubernetes cluster
+- name: Setup Kubernetes cluster
+  block:
+    - name: Check if cluster is already initialized
+      block:
+        - name: Check user home for kubeconfig
+          block:
+            - name: Check if user home has a kubeconfig
+              ansible.builtin.stat:
+                path: "{{ ansible_env.HOME }}/.kube/config"
+              register: user_home_kubeconfig_check
+
+            - name: Debug user home kubeconfig check
+              ansible.builtin.debug:
+                msg:
+                  - "Path: {{ ansible_env.HOME }}/.kube/config"
+                  - "Exists: {{ user_home_kubeconfig_check.stat.exists }}"
+                  - "Full stat: {{ user_home_kubeconfig_check.stat }}"
+
+            - name: Set user home kubeconfig exists fact
+              ansible.builtin.set_fact:
+                kube_config_exists_in_user_home: "{{ user_home_kubeconfig_check.stat.exists }}"
+
+        - name: Check root for kubeconfig
+          block:
+            - name: Check if root has a kubeconfig
+              ansible.builtin.stat:
+                path: /root/.kube/config
+              register: root_kubeconfig_check
+              become: true
+
+            - name: Set root kubeconfig exists fact
+              ansible.builtin.set_fact:
+                kube_config_exists_in_root: "{{ root_kubeconfig_check.stat.exists }}"
+
+        - name: Debug kubeconfig facts
+          ansible.builtin.debug:
+            msg:
+              - "User home kubeconfig exists: {{ kube_config_exists_in_user_home }}"
+              - "Root kubeconfig exists: {{ kube_config_exists_in_root }}"
+
+        - name: Check cluster initialization status
+          block:
+            - name: Check if cluster is already initialized
+              ansible.builtin.command: kubectl get nodes
+              register: cluster_already_exists
+              changed_when: false
+              ignore_errors: true
+              when: kube_config_exists_in_user_home or kube_config_exists_in_root
+
+            - name: Set cluster initialization status
+              ansible.builtin.set_fact:
+                cluster_initialized: "{{ cluster_already_exists.rc == 0 and 'Ready' in cluster_already_exists.stdout }}"
+              when: kube_config_exists_in_user_home or kube_config_exists_in_root
+
+            - name: Debug cluster initialization status
+              ansible.builtin.debug:
+                msg: "Cluster is {{ 'already initialized' if cluster_initialized else 'not initialized' }}"
+
+    - name: Move kubeconfig file to user directory
+      when: cluster_initialized and kube_config_exists_in_root and not kube_config_exists_in_user_home
+      block:
+        - name: Create .kube directory if it doesn't exist
+          ansible.builtin.file:
+            path: "{{ ansible_env.HOME }}/.kube"
+            state: directory
+            mode: '0755'
+
+        - name: Copy kubeconfig from root to user directory
+          ansible.builtin.copy:
+            src: /root/.kube/config
+            dest: "{{ ansible_env.HOME }}/.kube/config"
+            remote_src: true
+            mode: '0644'
+          become: true
+          changed_when: true
+
+    - name: Initialize cluster
+      when: not cluster_initialized
+      block:
+        - name: Reset any existing cluster
+          ansible.builtin.command: kubeadm reset -f
+          become: true
+          changed_when: true
+
+        - name: Initialize cluster with kubeadm
+          ansible.builtin.command: >
+            kubeadm init
+            --apiserver-advertise-address={{ ansible_default_ipv4.address }}
+            --apiserver-cert-extra-sans=localhost
+            --pod-network-cidr=10.244.0.0/16
+            --ignore-preflight-errors=all
+            --node-name={{ ansible_hostname }}
+          become: true
+          changed_when: not cluster_initialized
+
+        - name: Create .kube directory
+          ansible.builtin.file:
+            path: "{{ ansible_env.HOME }}/.kube"
+            state: directory
+            mode: '0755'
+
+        - name: Copy kubeconfig to user directory
+          ansible.builtin.copy:
+            src: /etc/kubernetes/admin.conf
+            dest: "{{ ansible_env.HOME }}/.kube/config"
+            remote_src: true
+            mode: '0644'
+          become: true
+          changed_when: not cluster_initialized
+
+- name: Wait for node to be ready
+  kubernetes.core.k8s_info:
+    name: "{{ ansible_hostname }}"
+    kind: Node
+    wait: true
+    wait_condition:
+      type: Ready
+      status: "True"
+    wait_timeout: 300
+  register: node_wait
+  retries: 6
+  delay: 5
+  until: node_wait is success
+  changed_when: false
+
+- name: Install and configure Cilium
+  when: cluster_initialized
+  block:
+    - name: Check if Cilium CLI is installed
+      ansible.builtin.command: which cilium
+      register: cilium_cli_check
+      changed_when: false
+      ignore_errors: true
+
+    - name: Check if Cilium is running in cluster
+      ansible.builtin.command: kubectl get pods -n kube-system -l k8s-app=cilium
+      register: cilium_pods_check
+      changed_when: false
+      ignore_errors: true
+
+    - name: Set Cilium installation status
+      ansible.builtin.set_fact:
+        cilium_installed: "{{ cilium_cli_check.rc == 0 and 'cilium' in cilium_pods_check.stdout }}"
+
+    - name: Debug Cilium status
+      ansible.builtin.debug:
+        msg:
+          - "Cilium CLI installed: {{ cilium_cli_check.rc == 0 }}"
+          - "Cilium pods running: {{ 'cilium' in cilium_pods_check.stdout }}"
+          - "Cilium fully installed: {{ cilium_installed }}"
+
+    - name: Install Cilium CLI
+      when: not cilium_cli_check.rc == 0
+      block:
+        - name: Download Cilium CLI
+          ansible.builtin.get_url:
+            url: https://github.com/cilium/cilium-cli/releases/latest/download/cilium-linux-amd64.tar.gz
+            dest: /tmp/cilium-linux-amd64.tar.gz
+            mode: '0644'
+          changed_when: true
+
+        - name: Extract Cilium CLI
+          ansible.builtin.unarchive:
+            src: /tmp/cilium-linux-amd64.tar.gz
+            dest: /usr/local/bin
+            remote_src: true
+          become: true
+          changed_when: true
+
+        - name: Clean up downloaded file
+          ansible.builtin.file:
+            path: /tmp/cilium-linux-amd64.tar.gz
+            state: absent
+          changed_when: true
+
+    - name: Install Cilium
+      when: not cilium_installed
+      ansible.builtin.command: cilium install --kubeconfig /etc/kubernetes/admin.conf
+      changed_when: true
+      register: cilium_install
+      become: true
+
+    - name: Wait for Cilium to be ready
+      ansible.builtin.command: cilium status --wait
+      register: cilium_status
+      retries: 20
+      delay: 3
+      until: cilium_status.rc == 0
+      changed_when: false
