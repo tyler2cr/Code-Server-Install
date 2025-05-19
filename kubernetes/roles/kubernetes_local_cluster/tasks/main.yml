@@ -35,25 +35,31 @@
 #           when: kubectl_check.rc != 0
 #           become: true
 
-#     - name: Check kubeadm installation status
-#       block:
-#         - name: Check if kubeadm is installed
-#           ansible.builtin.command: which kubeadm
-#           register: kubeadm_check
-#           changed_when: false
-#           ignore_errors: true
+    # - name: Check kubeadm installation status
+    #   block:
+    #     - name: Check if kubeadm is installed
+    #       ansible.builtin.command: which kubeadm
+    #       register: kubeadm_check
+    #       changed_when: false
+    #       ignore_errors: true
 
-#         - name: Debug kubeadm status
-#           ansible.builtin.debug:
-#             msg: "kubeadm is {{ 'installed' if kubeadm_check.rc == 0 else 'not installed' }}"
+    #     - name: Debug kubeadm status
+    #       ansible.builtin.debug:
+    #         msg: "kubeadm is {{ 'installed' if kubeadm_check.rc == 0 else 'not installed' }}"
 
-#         - name: Install kubeadm
-#           ansible.builtin.apt:
-#             name: kubeadm
-#             state: present
-#             update_cache: true
-#           when: kubeadm_check.rc != 0
-#           become: true
+    #     - name: Install kubeadm
+    #       ansible.builtin.apt:
+    #         name: kubeadm
+    #         state: present
+    #         update_cache: true
+    #       when: kubeadm_check.rc != 0
+    #       become: true
+    
+    # - name: Install kubernetes Python package
+    #   ansible.builtin.pip:
+    #     name: kubernetes
+    #     state: present
+    #   become: true
 
 #     - name: Check kubelet installation status
 #       block:
@@ -192,20 +198,29 @@
           become: true
           changed_when: not cluster_initialized
 
-        - name: Wait for node to be ready
-          kubernetes.core.k8s_info:
-            name: "{{ ansible_hostname }}"
-            kind: Node
-            wait: true
-            wait_condition:
-              type: Ready
-              status: "True"
-            wait_timeout: 300
-          register: node_wait
-          retries: 3
-          delay: 10
-          until: node_wait is success
-          changed_when: false
+- name: Wait for node to be ready
+  block:
+    # todo move this to deps install block at top of file
+    - name: Install kubernetes Python package
+      ansible.builtin.pip:
+        name: kubernetes
+        state: present
+      become: true
+
+    - name: Wait for node to be ready
+      kubernetes.core.k8s_info:
+        name: "{{ ansible_hostname }}"
+        kind: Node
+        wait: true
+        wait_condition:
+          type: Ready
+          status: "True"
+        wait_timeout: 300
+      register: node_wait
+      retries: 3
+      delay: 10
+      until: node_wait is success
+      changed_when: false
 
     # - name: Install and configure Cilium
     #   when: not cluster_initialized
