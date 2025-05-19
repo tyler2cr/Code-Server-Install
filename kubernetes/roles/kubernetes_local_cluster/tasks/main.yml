@@ -10,3 +10,6 @@
 
 - name: Control plane taint removal tasks (enable scheduling worknodes)
   ansible.builtin.import_tasks: control_plane_enable_workload_scheduling.yml
+
+- name: Storage setup tasks
+  ansible.builtin.import_tasks: storage_setup.yml

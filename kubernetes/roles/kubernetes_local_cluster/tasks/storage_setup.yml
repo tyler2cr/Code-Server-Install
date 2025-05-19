@@ -1,0 +1,50 @@
+---
+- name: Check if OpenEBS is installed
+  kubernetes.core.k8s_info:
+    kind: Namespace
+    name: openebs
+  register: openebs_check
+  changed_when: false
+  ignore_errors: true
+
+- name: Install OpenEBS
+  when: openebs_check.resources | length == 0
+  block:
+    - name: Add OpenEBS Helm repo
+      kubernetes.core.helm_repository:
+        name: openebs
+        repo_url: https://openebs.github.io/charts
+
+    - name: Install OpenEBS
+      kubernetes.core.helm:
+        name: openebs
+        chart_ref: openebs/openebs
+        namespace: openebs
+        create_namespace: true
+        values:
+          localprovisioner:
+            enabled: true
+            basePath: /var/openebs/local
+          ndm:
+            enabled: true
+          ndmOperator:
+            enabled: true
+        state: present
+
+- name: Wait for OpenEBS pods to be ready
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: openebs
+    label_selectors:
+      - app=openebs
+      - component=localpv-provisioner
+    wait: true
+    wait_condition:
+      type: Ready
+      status: "True"
+    wait_timeout: 10
+  register: pod_wait
+  retries: 20
+  delay: 3
+  until: pod_wait.resources | length > 0
+  changed_when: false
