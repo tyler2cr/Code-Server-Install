@@ -6,17 +6,18 @@
     kind: Namespace
     state: present
 
-- name: Add code-server Helm repository
-  kubernetes.core.helm_repository:
-    name: code-server
-    repo_url: https://coder.com/docs/code-server/helm
+- name: Clone code-server repository
+  ansible.builtin.git:
+    repo: https://github.com/coder/code-server
+    dest: /tmp/code-server
+    version: main
+    force: true
 
 - name: Install code-server using Helm
   kubernetes.core.helm:
     name: code-server
-    chart_ref: code-server/code-server
+    chart_ref: /tmp/code-server/ci/helm-chart
     namespace: code-server
-    release_namespace: code-server
     state: present
     values:
       service:
@@ -24,4 +25,16 @@
         port: 8443
       persistence:
         enabled: true
-        size: 10Gi 
+        storageClass: openebs-hostpath
+        size: 10Gi
+      securityContext:
+        enabled: true
+        fsGroup: 1000
+        runAsUser: 1000
+      volumePermissions:
+        enabled: true
+        securityContext:
+          runAsUser: 0
+      extraArgs:
+        - --cert=false
+        - --bind-addr=0.0.0.0:8443
